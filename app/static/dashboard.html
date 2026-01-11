@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Orders Dashboard</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+        th { background: #f4f4f4; }
+        button { padding: 5px 10px; margin: 2px; cursor: pointer; }
+        .NEW { color: blue; font-weight: bold; background-color: #e3f2fd;}
+        .PREPARING { color: orange; font-weight: bold; }
+        .DELIVERED { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<h2>🧾 Orders Dashboard</h2>
+
+<table id="orders">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Phone</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Total (₹)</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script>
+
+let loading = false;
+async function loadOrders() {
+
+    if (loading) return;
+    loading = true;
+
+    const res = await fetch("/admin/orders");
+    const orders = await res.json();
+
+    const tbody = document.querySelector("#orders tbody");
+    tbody.innerHTML = "";
+
+    orders.forEach(o => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${o.id}</td>
+            <td>${o.phone}</td>
+            <td>${o.item}</td>
+            <td>${o.quantity}</td>
+            <td>${o.total}</td>
+            <td class="${o.status}">${o.status}</td>
+            <td>
+                ${o.status !== "DELIVERED" ? `
+                    <button onclick="updateStatus(${o.id}, 'PREPARING')">PREPARING</button>
+                    <button onclick="updateStatus(${o.id}, 'DELIVERED')">DELIVERED</button>
+                ` : "—"}
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    loading = false;
+}
+
+async function updateStatus(id, status) {
+    await fetch(`/admin/orders/${id}?status=${status}`, {
+        method: "PATCH"
+    });
+    loadOrders();
+}
+
+// 🔄 AUTO REFRESH EVERY 10 SECONDS
+setInterval(loadOrders, 10000);
+
+loadOrders();
+</script>
+
+</body>
+</html>
