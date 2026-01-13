@@ -60,12 +60,14 @@ def init_db():
             subtotal INTEGER,
             delivery INTEGER,
             total INTEGER,
+            status TEXT,
             created_at TEXT
         )
     """)
 
     conn.commit()
     conn.close()
+
 
 
 def save_order(phone, item, quantity, price, subtotal, delivery, total):
@@ -90,5 +92,3 @@ def save_order(phone, item, quantity, price, subtotal, delivery, total):
 
     conn.commit()
     conn.close()
-
-    

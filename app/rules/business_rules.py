@@ -2,6 +2,8 @@ from app.rules.intents import detect_intent
 from app.memory.session_store import get_session, reset_session
 from app.services.database import save_order
 
+print("🔥 MULTI-ITEM BUSINESS RULES LOADED")
+
 MENU_ITEMS = ["tea", "coffee", "green tea"]
 MENU_PRICES = {
     "tea": 50,
@@ -12,80 +14,109 @@ MENU_PRICES = {
 DELIVERY_CHARGE = 50
 FREE_DELIVERY_MIN = 500
 
+ORDER_ITEM = "ORDER_ITEM"
+ORDER_QTY = "ORDER_QTY"
+ADD_MORE = "ADD_MORE"
+CONFIRM = "CONFIRM"
 
-def apply_business_rules(message: str, user_id: str) -> str | None:
+
+def apply_business_rules(message: str, user_id: str):
     msg = message.lower().strip()
     session = get_session(user_id)
-    intent = detect_intent(msg)
 
-    # 🔁 ACTIVE ORDER FLOW
-    if session["state"] == "ORDER_ITEM":
+    # ✅ HARD SAFETY: always ensure items list exists
+    if "order" not in session:
+        session["order"] = {"items": []}
+    if "items" not in session["order"]:
+        session["order"]["items"] = []
+
+    print("🧠 CURRENT STATE:", session["state"])
+    print("📦 CURRENT ITEMS:", session["order"]["items"])
+
+    # 🔒 Detect intent ONLY if no active state
+    intent = detect_intent(msg) if session["state"] is None else None
+
+    # =========================
+    # 🔁 MULTI-ITEM ORDER FLOW
+    # =========================
+
+    if session["state"] == ORDER_ITEM:
         if msg in MENU_ITEMS:
-            session["order"]["item"] = msg
-            session["state"] = "ORDER_QTY"
+            session["current_item"] = msg
+            session["state"] = ORDER_QTY
             return f"How many *{msg.title()}* would you like?"
 
-        return "Please choose a valid item: Tea, Coffee, Green Tea."
+        return "Please choose a valid item:\nTea / Coffee / Green Tea"
 
-    if session["state"] == "ORDER_QTY":
+    if session["state"] == ORDER_QTY:
         if msg.isdigit() and int(msg) > 0:
-            session["order"]["qty"] = int(msg)
-            session["state"] = "CONFIRM"
-
-            item = session["order"]["item"]
-            qty = session["order"]["qty"]
+            qty = int(msg)
+            item = session["current_item"]
             price = MENU_PRICES[item]
-            subtotal = price * qty
-            delivery_fee = 0 if subtotal >= FREE_DELIVERY_MIN else DELIVERY_CHARGE
-            total = subtotal + delivery_fee
 
-            # store calculation for confirm step
-            session["order"].update({
+            session["order"]["items"].append({
+                "item": item,
+                "qty": qty,
                 "price": price,
-                "subtotal": subtotal,
-                "delivery": delivery_fee,
-                "total": total
+                "subtotal": price * qty
             })
 
-            return (
-                f"🧾 *Confirm Order*\n"
-                f"Item: {item.title()}\n"
-                f"Quantity: {qty}\n"
-                f"Price: ₹{price} each\n\n"
-                f"Subtotal: ₹{subtotal}\n"
-                f"Delivery: {'FREE' if delivery_fee == 0 else f'₹{delivery_fee}'}\n"
-                f"*Total: ₹{total}*\n\n"
-                f"Reply *Yes* to confirm or *No* to cancel."
-            )
+            session.pop("current_item", None)
+            session["state"] = ADD_MORE
+
+            return "➕ Anything else? (Yes / No)"
 
         return "Please enter a valid quantity."
 
-    if session["state"] == "CONFIRM":
+    if session["state"] == ADD_MORE:
         if msg in ["yes", "y"]:
-            order = session["order"]
+            session["state"] = ORDER_ITEM
+            return "What else would you like?"
 
-            # 💾 SAVE TO DATABASE
-            print("💾 CALLING save_order() with:", user_id, order)
-            
-            save_order(
-                phone=user_id,
-                item=order["item"],
-                quantity=order["qty"],
-                price=order["price"],
-                subtotal=order["subtotal"],
-                delivery=order["delivery"],
-                total=order["total"]
+        if msg in ["no", "n"]:
+            total = sum(i["subtotal"] for i in session["order"]["items"])
+            delivery = 0 if total >= FREE_DELIVERY_MIN else DELIVERY_CHARGE
+            grand_total = total + delivery
+
+            session["order"].update({
+                "total": total,
+                "delivery": delivery,
+                "grand_total": grand_total
+            })
+
+            session["state"] = CONFIRM
+
+            summary = "\n".join(
+                f"{i['item'].title()} x {i['qty']} = ₹{i['subtotal']}"
+                for i in session["order"]["items"]
             )
-
-            reset_session(user_id)
 
             return (
-                f"✅ *Order Placed Successfully!*\n\n"
-                f"Item: {order['item'].title()}\n"
-                f"Quantity: {order['qty']}\n"
-                f"*Total Paid: ₹{order['total']}*\n\n"
-                f"🙏 Thank you for ordering with us!"
+                f"🧾 *Order Summary*\n\n"
+                f"{summary}\n\n"
+                f"Subtotal: ₹{total}\n"
+                f"Delivery: {'FREE' if delivery == 0 else f'₹{delivery}'}\n"
+                f"*Total: ₹{grand_total}*\n\n"
+                f"Reply *Yes* to confirm or *No* to cancel."
             )
+
+        return "Please reply Yes or No."
+
+    if session["state"] == CONFIRM:
+        if msg in ["yes", "y"]:
+            for item in session["order"]["items"]:
+                save_order(
+                    phone=user_id,
+                    item=item["item"],
+                    quantity=item["qty"],
+                    price=item["price"],
+                    subtotal=item["subtotal"],
+                    delivery=session["order"]["delivery"],
+                    total=session["order"]["grand_total"]
+                )
+
+            reset_session(user_id)
+            return "✅ *Order placed successfully!* 🎉"
 
         if msg in ["no", "n"]:
             reset_session(user_id)
@@ -93,12 +124,19 @@ def apply_business_rules(message: str, user_id: str) -> str | None:
 
         return "Please reply *Yes* or *No*."
 
+    # =========================
     # 🆕 START ORDER
+    # =========================
+
     if intent == "order":
-        session["state"] = "ORDER_ITEM"
+        session["state"] = ORDER_ITEM
+        session["order"] = {"items": []}
         return "🛒 What item would you like to order?\nTea / Coffee / Green Tea"
 
-    # 🧠 STATIC RULES
+    # =========================
+    # ℹ️ STATIC RESPONSES
+    # =========================
+
     if intent == "greeting":
         return "Hello 👋 How can I help you today?"
 

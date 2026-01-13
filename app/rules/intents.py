@@ -1,19 +1,19 @@
 def detect_intent(message: str) -> str:
-    msg = message.lower()
+    msg = message.lower().strip()
 
-    if any(word in msg for word in ["hi", "hello", "hey"]):
+    if msg in ["hi", "hello", "hey"]:
         return "greeting"
 
-    if any(word in msg for word in ["menu", "items", "price list"]):
+    if msg in ["menu", "items", "price list"]:
         return "menu"
 
-    if any(word in msg for word in ["delivery", "shipping"]):
+    if msg in ["delivery", "shipping"]:
         return "delivery"
 
-    if any(word in msg for word in ["order", "buy", "purchase"]):
+    if msg in ["order", "buy", "purchase"]:
         return "order"
 
-    if any(word in msg for word in ["agent", "human", "support"]):
+    if msg in ["agent", "human", "support"]:
         return "human"
 
     return "unknown"
