@@ -11,6 +11,28 @@ print("🗄️ USING DATABASE:", DB_PATH)
 def get_connection():
     return sqlite3.connect(DB_PATH)
 
+def create_order(phone, subtotal, delivery, total):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO orders (phone, subtotal, delivery, total, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        phone,
+        subtotal,
+        delivery,
+        total,
+        "NEW",
+        datetime.now().isoformat()
+    ))
+
+    order_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return order_id
+
+
 def update_order_status(order_id, status):
     conn = get_connection()
     cursor = conn.cursor()
@@ -44,6 +66,25 @@ def get_order_by_id(order_id):
         "item": row[2],
         "status": row[3]
     }
+
+def add_order_item(order_id, item, quantity, price, subtotal):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO order_items
+        (order_id, item, quantity, price, subtotal)
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        order_id,
+        item,
+        quantity,
+        price,
+        subtotal
+    ))
+
+    conn.commit()
+    conn.close()
 
 
 def init_db():

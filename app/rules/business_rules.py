@@ -1,6 +1,8 @@
 from app.rules.intents import detect_intent
 from app.memory.session_store import get_session, reset_session
 from app.services.database import save_order
+from app.services.database import create_order, add_order_item
+from app.memory.session_store import reset_session
 
 print("🔥 MULTI-ITEM BUSINESS RULES LOADED")
 
@@ -104,19 +106,31 @@ def apply_business_rules(message: str, user_id: str):
 
     if session["state"] == CONFIRM:
         if msg in ["yes", "y"]:
-            for item in session["order"]["items"]:
-                save_order(
-                    phone=user_id,
+            order = session["order"]
+
+            # 1️⃣ Create ONE order
+            order_id = create_order(
+                phone=user_id,
+                subtotal=order["total"],
+                delivery=order["delivery"],
+                total=order["grand_total"]
+            )
+
+            # 2️⃣ Add multiple items
+            for item in order["items"]:
+                add_order_item(
+                    order_id=order_id,
                     item=item["item"],
                     quantity=item["qty"],
                     price=item["price"],
-                    subtotal=item["subtotal"],
-                    delivery=session["order"]["delivery"],
-                    total=session["order"]["grand_total"]
+                    subtotal=item["subtotal"]
                 )
 
+            # 3️⃣ Reset session
             reset_session(user_id)
+
             return "✅ *Order placed successfully!* 🎉"
+
 
         if msg in ["no", "n"]:
             reset_session(user_id)

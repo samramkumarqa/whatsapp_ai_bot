@@ -22,8 +22,7 @@
         <tr>
             <th>ID</th>
             <th>Phone</th>
-            <th>Item</th>
-            <th>Qty</th>
+            <th>Items</th>
             <th>Total (₹)</th>
             <th>Status</th>
             <th>Action</th>
@@ -47,20 +46,22 @@ async function loadOrders() {
     tbody.innerHTML = "";
 
     orders.forEach(o => {
+        const itemsHtml = o.items.map(i =>
+            `${i.item.toUpperCase()} x ${i.quantity} = ₹${i.subtotal}`
+        ).join("<br>");
+
         const row = document.createElement("tr");
+
         row.innerHTML = `
             <td>${o.id}</td>
             <td>${o.phone}</td>
-            <td>${o.item}</td>
-            <td>${o.quantity}</td>
-            <td>${o.total}</td>
+            <td>${itemsHtml}</td>
+            <td>₹${o.total}</td>
             <td class="${o.status}">${o.status}</td>
             <td>
-                ${o.status !== "DELIVERED" ? `
-                    <button onclick="updateStatus(${o.id}, 'PREPARING')">PREPARING</button>
-                    <button onclick="updateStatus(${o.id}, 'DELIVERED')">DELIVERED</button>
-                ` : "—"}
-            </td>
+                <button onclick="updateStatus(${o.id}, 'PREPARING')">PREPARING</button>
+                <button onclick="updateStatus(${o.id}, 'DELIVERED')">DELIVERED</button>
+            </td>   
         `;
         tbody.appendChild(row);
     });

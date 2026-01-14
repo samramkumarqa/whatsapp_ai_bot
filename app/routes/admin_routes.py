@@ -28,28 +28,52 @@ def get_orders():
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT id, phone, item, quantity, subtotal, delivery, total, status, created_at
-        FROM orders
-        ORDER BY created_at DESC
+        SELECT
+            o.id,
+            o.phone,
+            o.subtotal,
+            o.delivery,
+            o.total,
+            o.status,
+            o.created_at,
+            i.item,
+            i.quantity,
+            i.price,
+            i.subtotal
+        FROM orders o
+        JOIN order_items i ON o.id = i.order_id
+        ORDER BY o.created_at DESC
     """)
 
     rows = cursor.fetchall()
     conn.close()
 
-    return [
-        {
-            "id": r[0],
-            "phone": r[1],
-            "item": r[2],
-            "quantity": r[3],
-            "subtotal": r[4],
-            "delivery": r[5],
-            "total": r[6],
-            "status": r[7],
-            "created_at": r[8],
-        }
-        for r in rows
-    ]
+    orders = {}
+
+    for r in rows:
+        order_id = r[0]
+
+        if order_id not in orders:
+            orders[order_id] = {
+                "id": r[0],
+                "phone": r[1],
+                "subtotal": r[2],
+                "delivery": r[3],
+                "total": r[4],
+                "status": r[5],
+                "created_at": r[6],
+                "items": []
+            }
+
+        orders[order_id]["items"].append({
+            "item": r[7],
+            "quantity": r[8],
+            "price": r[9],
+            "subtotal": r[10]
+        })
+
+    return list(orders.values())
+
 
 @router.patch("/orders/{order_id}", dependencies=[Depends(admin_auth)])
 def change_status(order_id: int, status: str):
