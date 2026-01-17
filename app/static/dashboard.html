@@ -11,6 +11,15 @@
         .NEW { color: blue; font-weight: bold; background-color: #e3f2fd;}
         .PREPARING { color: orange; font-weight: bold; }
         .DELIVERED { color: green; font-weight: bold; }
+
+        .badge {
+            background: #2563eb;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 6px;
+        }
     </style>
 </head>
 <body>
@@ -32,8 +41,8 @@
 </table>
 
 <script>
-
 let loading = false;
+
 async function loadOrders() {
 
     if (loading) return;
@@ -46,6 +55,14 @@ async function loadOrders() {
     tbody.innerHTML = "";
 
     orders.forEach(o => {
+
+        // 🔢 ITEM COUNT (sum of quantities)
+        const itemCount = o.items.reduce(
+            (sum, i) => sum + i.quantity,
+            0
+        );
+
+        // 🧾 ITEM DETAILS
         const itemsHtml = o.items.map(i =>
             `${i.item.toUpperCase()} x ${i.quantity} = ₹${i.subtotal}`
         ).join("<br>");
@@ -55,7 +72,10 @@ async function loadOrders() {
         row.innerHTML = `
             <td>${o.id}</td>
             <td>${o.phone}</td>
-            <td>${itemsHtml}</td>
+            <td>
+                <span class="badge">${itemCount} items</span><br><br>
+                ${itemsHtml}
+            </td>
             <td>₹${o.total}</td>
             <td class="${o.status}">${o.status}</td>
             <td>
@@ -63,8 +83,10 @@ async function loadOrders() {
                 <button onclick="updateStatus(${o.id}, 'DELIVERED')">DELIVERED</button>
             </td>   
         `;
+
         tbody.appendChild(row);
     });
+
     loading = false;
 }
 
