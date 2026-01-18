@@ -80,16 +80,53 @@ def change_status(order_id: int, status: str):
     if status not in ALLOWED_STATUSES:
         return {"error": "Invalid status"}
 
+    # 1️⃣ Update DB
     update_order_status(order_id, status)
+
+    # 2️⃣ Fetch order
     order = get_order_by_id(order_id)
+    if not order:
+        return {"error": "Order not found"}
 
-    if order:
-        if status == "PREPARING":
-            msg = f"🍳 Your *{order['item'].title()}* is being prepared."
-        elif status == "DELIVERED":
-            msg = f"🚚 Your *{order['item'].title()}* has been delivered. Thank you!"
+    # 3️⃣ Fetch items for this order
+    conn = get_connection()
+    cursor = conn.cursor()
 
-        if msg:
-            send_whatsapp_message(order["phone"], msg)
+    cursor.execute("""
+        SELECT item, quantity
+        FROM order_items
+        WHERE order_id = ?
+    """, (order_id,))
+
+    items = cursor.fetchall()
+    conn.close()
+
+    # 4️⃣ Build items text
+    items_text = "\n".join(
+        f"- {item.title()} x {qty}"
+        for item, qty in items
+    )
+
+    # 5️⃣ Build WhatsApp message
+    if status == "PREPARING":
+        msg = (
+            f"🍳 *Order Update*\n\n"
+            f"Your order #{order_id} is being prepared.\n\n"
+            f"{items_text}"
+        )
+    elif status == "DELIVERED":
+        msg = (
+            f"🚚 *Order Delivered*\n\n"
+            f"Your order #{order_id} has been delivered.\n\n"
+            f"{items_text}\n\n"
+            f"Thank you for ordering with us 🙏"
+        )
+    else:
+        msg = None
+
+    # 6️⃣ Send WhatsApp
+    if msg:
+        send_whatsapp_message(order["phone"], msg)
 
     return {"status": "updated"}
+
